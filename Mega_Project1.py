@@ -7,10 +7,11 @@ from google import genai
 from gtts import gTTS
 import pygame
 import os
+import time
 
 recognizer = sr.Recognizer()  # Helps in recognizing speech
 engine = pyttsx3.init()  # pyttsx gets initialised
-newsapi = "YOUR_NEWS_API_KEY_HERE"
+newsapi = "bebad34df02f4c5ca72f299ff14ce533"
 
 
 def speak_old(text):
@@ -39,15 +40,29 @@ def speak(text):
     os.remove("temp.mp3")
 
 
+api_key = "YOUR GEMINI API KEY"
+
+
 def aiProcess(command):
-    client = genai.Client(api_key="YOUR_GEMINI_API_KEY_HERE")
+    client = genai.Client(api_key=api_key)
 
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=command,
-    )
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=command,
+        )
+        return response.text
 
-    return response.text
+    except genai.errors.ClientError as e:
+        if "429" in str(e):
+            print("⚠️ Rate limit reached! Free tier allows 20 requests/min.")
+            return "Sir, I am hitting the free tier request limit. Please wait a minute before asking again."
+        else:
+            speak(f"API Error: {e}")
+            return "Sorry, I encountered an API error."
+    except Exception as e:
+        speak(f"General Error: {e}")
+        return "I am unable to process that request right now."
 
 
 def processCommand(c):
@@ -63,10 +78,21 @@ def processCommand(c):
     elif "open linkedin" in c.lower():
         webbrowser.open("https://linkedin.com")
 
-    elif c.lower().startswith("play"):
-        song = c.lower().split(" ")[1]
-        link = musicLibrary.music[song]
-        webbrowser.open(link)
+    elif "play" in c.lower():
+        song_found = False
+
+        # Loop through your music dictionary keys from musicLibrary
+        for song_name in musicLibrary.music.keys():
+            # Check if the song name (e.g., "apna bana le") is anywhere in your command
+            if song_name in c.lower():
+                link = musicLibrary.music[song_name]
+                print(f"Matching song found: Opening {song_name}...")
+                webbrowser.open(link)
+                song_found = True
+                break  # Stop checking once we find a match
+
+        if not song_found:
+            speak("Sorry, I couldn't find that song in your music library.")
 
     elif "news" in c.lower():
         r = requests.get(
@@ -105,7 +131,7 @@ if __name__ == "__main__":
                 audio = r.listen(source)
             word = r.recognize_google(audio)
             if word.lower() == "jarvis":
-                speak("Ya")
+                speak("Yes")
                 # Listen for command
                 with sr.Microphone() as source:
                     print("Jarvis Active...")
@@ -113,6 +139,7 @@ if __name__ == "__main__":
                     command = r.recognize_google(audio)
 
                     processCommand(command)
+                    time.sleep(2)
 
         except Exception as e:
             print("Error; {0}".format(e))
